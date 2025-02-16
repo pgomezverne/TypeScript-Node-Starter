@@ -1,20 +1,25 @@
-import bcrypt from "bcrypt-nodejs";
+import bcrypt from "bcryptjs"; // Cambiado a bcryptjs
 import crypto from "crypto";
-import mongoose from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
 
-export type UserDocument = mongoose.Document & {
+export type UserDocument = Document & {
     email: string;
     password: string;
     passwordResetToken: string;
     passwordResetExpires: Date;
 
     facebook: string;
+    twitter: string;
+    google: string;
     tokens: AuthToken[];
 
     profile: {
         name: string;
         gender: string;
-        location: string;
+        location: {
+            type: string;
+            coordinates: [number, number];
+        };
         website: string;
         picture: string;
     };
@@ -23,29 +28,32 @@ export type UserDocument = mongoose.Document & {
     gravatar: (size: number) => string;
 };
 
-type comparePasswordFunction = (candidatePassword: string, cb: (err: any, isMatch: any) => void) => void;
+type comparePasswordFunction = (candidatePassword: string, cb: (err: Error | null, isMatch: boolean) => void) => void;
 
 export interface AuthToken {
     accessToken: string;
     kind: string;
 }
 
-const userSchema = new mongoose.Schema<UserDocument>(
+const userSchema = new Schema<UserDocument>(
     {
-        email: { type: String, unique: true },
-        password: String,
+        email: { type: String, unique: true, required: true, match: [/.+\@.+\..+/, "Please fill a valid email address"] },
+        password: { type: String, required: true, minlength: 6 },
         passwordResetToken: String,
         passwordResetExpires: Date,
     
         facebook: String,
         twitter: String,
         google: String,
-        tokens: Array,
+        tokens: [{ accessToken: String, kind: String }],
     
         profile: {
             name: String,
             gender: String,
-            location: String,
+            location: {
+                type: { type: String, enum: ["Point"], required: true },
+                coordinates: { type: [Number], required: true }
+            },
             website: String,
             picture: String
         }
@@ -59,9 +67,9 @@ const userSchema = new mongoose.Schema<UserDocument>(
 userSchema.pre("save", function save(next) {
     const user = this as UserDocument;
     if (!user.isModified("password")) { return next(); }
-    bcrypt.genSalt(10, (err, salt) => {
+    bcrypt.genSalt(10, (err: Error | null, salt: string) => {
         if (err) { return next(err); }
-        bcrypt.hash(user.password, salt, undefined, (err: mongoose.Error, hash) => {
+        bcrypt.hash(user.password, salt, (err: Error | null, hash: string) => {
             if (err) { return next(err); }
             user.password = hash;
             next();
@@ -70,7 +78,7 @@ userSchema.pre("save", function save(next) {
 });
 
 const comparePassword: comparePasswordFunction = function (candidatePassword, cb) {
-    bcrypt.compare(candidatePassword, this.password, (err: mongoose.Error, isMatch: boolean) => {
+    bcrypt.compare(candidatePassword, this.password, (err: Error | null, isMatch: boolean) => {
         cb(err, isMatch);
     });
 };

@@ -94,7 +94,13 @@ export const postSignup = async (req: Request, res: Response, next: NextFunction
 
     const user = new User({
         email: req.body.email,
-        password: req.body.password
+        password: req.body.password,
+        profile: {
+            location: {
+                type: "Point",
+                coordinates: [req.body.longitude, req.body.latitude]
+            }
+        }
     });
 
     User.findOne({ email: req.body.email }, (err: NativeError, existingUser: UserDocument) => {
@@ -146,7 +152,10 @@ export const postUpdateProfile = async (req: Request, res: Response, next: NextF
         user.email = req.body.email || "";
         user.profile.name = req.body.name || "";
         user.profile.gender = req.body.gender || "";
-        user.profile.location = req.body.location || "";
+        user.profile.location = {
+            type: "Point",
+            coordinates: [req.body.longitude, req.body.latitude]
+        };
         user.profile.website = req.body.website || "";
         user.save((err: WriteError & CallbackError) => {
             if (err) {
